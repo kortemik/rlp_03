@@ -195,39 +195,42 @@ public class SocketProcessor implements Runnable {
                     if (clientRelpSocket == null) {
                         if (selectionKey.isAcceptable()) {
                             // create the client socket for a newly received connection
-                            SocketChannel socketChannel = serverSocket.accept();
+                            try (SocketChannel socketChannel =
+                                         serverSocket.accept()) {
 
-                            socketChannel.configureBlocking(false);
+                                socketChannel.configureBlocking(false);
 
-                            // new socket
-                            RelpServerSocket socket = new RelpServerSocket(socketChannel, frameProcessor);
+                                // new socket
+                                RelpServerSocket socket = new RelpServerPlainSocket(socketChannel, frameProcessor);
 
-                            socket.setSocketId(nextSocketId++);
+                                socket.setSocketId(nextSocketId++);
 
 
-                            socketMap.put(socket.getSocketId(), socket);
+                                socketMap.put(socket.getSocketId(), socket);
 
-                            // get next handler for this connection
-                            if (currentThread < numberOfThreads - 1) {
-                                currentThread++;
+                                // get next handler for this connection
+                                if (currentThread < numberOfThreads - 1) {
+                                    currentThread++;
+                                } else {
+                                    currentThread = 0;
+                                }
+
+                                if (System.getenv("RELP_SERVER_DEBUG") != null) {
+                                    System.out.println("socketProcessor> messageSelectorList: " + messageSelectorList.size()
+                                            + " currentThread: " + currentThread);
+                                }
+                                // all client connected sockets start in OP_READ
+                                SelectionKey key = socketChannel.register(
+                                        messageSelectorList.get(currentThread),
+                                        SelectionKey.OP_READ,
+                                        socket
+                                );
+                            } catch (IOException e) {
+                                e.printStackTrace();
                             }
-                            else {
-                                currentThread = 0;
-                            }
-
                             if (System.getenv("RELP_SERVER_DEBUG") != null) {
-                                System.out.println("socketProcessor> messageSelectorList: " + messageSelectorList.size()
-                                        + " currentThread: " + currentThread);
+                                System.out.println("socketProcessor.putNewSockets> exit with socketMap size: " + socketMap.size());
                             }
-                            // all client connected sockets start in OP_READ
-                            SelectionKey key = socketChannel.register(
-                                    messageSelectorList.get(currentThread),
-                                    SelectionKey.OP_READ,
-                                    socket
-                            );
-                        }
-                        if (System.getenv("RELP_SERVER_DEBUG") != null) {
-                            System.out.println( "socketProcessor.putNewSockets> exit with socketMap size: " + socketMap.size());
                         }
                     }
 
