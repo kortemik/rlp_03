@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.concurrent.locks.Lock;
@@ -91,16 +92,17 @@ public class RelpServerTlsSocket extends RelpServerSocket {
         this.messageWriter = new MessageWriter(this, txList);
 
 
-        SSLContext sslContext = null;
         try {
-            sslContext = SSLContext.getDefault();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
+            SSLContext sslContext = SSLContextFactory.authenticatedContext(
+                    "TLSv1.3");
 
-        this.socketChannel = ServerTlsChannel
-                .newBuilder(socketChannel, sslContext)
-                .build();
+            this.socketChannel = ServerTlsChannel
+                    .newBuilder(socketChannel, sslContext)
+                    .build();
+        }
+        catch (IOException | GeneralSecurityException ioException) {
+            throw new RuntimeException("Unable to instantiate SSLContext: " + ioException);
+        }
 
     }
 

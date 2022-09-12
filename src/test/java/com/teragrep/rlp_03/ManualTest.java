@@ -15,7 +15,7 @@ public class ManualTest {
         AtomicLong asd = new AtomicLong();
 
         cbFunction = (message) -> {
-            asd.getAndIncrement();
+            System.out.println(new String(message));
         };
         int port = 1601;
         Server server = new Server(port, new SyslogFrameProcessor(cbFunction));
