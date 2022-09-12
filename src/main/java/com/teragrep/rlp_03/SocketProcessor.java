@@ -197,12 +197,13 @@ public class SocketProcessor implements Runnable {
                             // create the client socket for a newly received connection
                             SocketChannel socketChannel = serverSocket.accept();
 
+                            socketChannel.configureBlocking(false);
+
                             // new socket
                             RelpServerSocket socket = new RelpServerSocket(socketChannel, frameProcessor);
 
                             socket.setSocketId(nextSocketId++);
 
-                            socket.getSocketChannel().configureBlocking(false);
 
                             socketMap.put(socket.getSocketId(), socket);
 
@@ -219,7 +220,7 @@ public class SocketProcessor implements Runnable {
                                         + " currentThread: " + currentThread);
                             }
                             // all client connected sockets start in OP_READ
-                            SelectionKey key = socket.getSocketChannel().register(
+                            SelectionKey key = socketChannel.register(
                                     messageSelectorList.get(currentThread),
                                     SelectionKey.OP_READ,
                                     socket
