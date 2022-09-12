@@ -201,7 +201,9 @@ public class SocketProcessor implements Runnable {
                                 socketChannel.configureBlocking(false);
 
                                 // new socket
-                                RelpServerSocket socket = new RelpServerSocket(socketChannel, frameProcessor);
+                                RelpServerSocket socket =
+                                        new RelpServerPlainSocket(socketChannel,
+                                                frameProcessor);
 
                                 socket.setSocketId(nextSocketId++);
 
