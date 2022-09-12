@@ -51,6 +51,12 @@
             <artifactId>rlp_01</artifactId>
             <version>2.1.0</version>
         </dependency>
+        <!-- tls -->
+        <dependency>
+            <groupId>com.github.marianobarrios</groupId>
+            <artifactId>tls-channel</artifactId>
+            <version>0.6.2</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
