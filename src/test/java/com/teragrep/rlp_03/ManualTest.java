@@ -8,13 +8,13 @@ import java.util.function.Consumer;
 
 public class ManualTest {
 
-    //@Test // for testing with manual tools
+    @Test // for testing with manual tools
     public void runServerTest() throws IOException, InterruptedException {
         final Consumer<byte[]> cbFunction;
         AtomicLong asd = new AtomicLong();
 
         cbFunction = (message) -> {
-            asd.getAndIncrement();
+            System.out.println(new String(message));
         };
         int port = 1601;
         Server server = new Server(port, new SyslogFrameProcessor(cbFunction));
