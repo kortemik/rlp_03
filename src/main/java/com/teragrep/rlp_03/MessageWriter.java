@@ -74,7 +74,7 @@ class MessageWriter {
      * @return READ state if there are no responses to be written, WRITE state if there is, and CLOSE
      * state if there are exceptions or SERVER_CLOSE message has been sent.
      */
-    ConnectionOperation writeResponse(){
+    ConnectionOperation writeResponse() throws Exception {
         if (System.getenv("RELP_SERVER_DEBUG") != null) {
             System.out.println("messageWriter.writeResponse> entry ");
         }

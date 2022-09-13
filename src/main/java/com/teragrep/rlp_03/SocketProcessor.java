@@ -249,14 +249,13 @@ public class SocketProcessor implements Runnable {
     private void runMessageSelector(Selector messageSelector, int finalThreadId) {
         try {
             int readReady = messageSelector.select(500); // TODO add configurable wait
-            /* TODO move behind a final variable to JIT it out, "slow code"
-            if (System.getenv("RELP_SERVER_DEBUG") != null) {
+
+            if (false) {
                 System.out.println( "runMessageSelector> enter with socketMap" +
                         " size: " + socketMap.size()
                 + " ready: " + readReady
                         );
             }
-             */
             if (readReady > 0) {
                 Set<SelectionKey> keys = messageSelector.selectedKeys();
 

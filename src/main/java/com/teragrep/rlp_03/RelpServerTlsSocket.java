@@ -51,12 +51,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.security.GeneralSecurityException;
-import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.teragrep.rlp_01.RelpFrameTX;
+import tlschannel.NeedsReadException;
+import tlschannel.NeedsWriteException;
 import tlschannel.ServerTlsChannel;
 import tlschannel.TlsChannel;
 
@@ -69,13 +68,22 @@ import javax.net.ssl.SSLContext;
 public class RelpServerTlsSocket extends RelpServerSocket {
 
     private long socketId;
-    private final TlsChannel socketChannel;
+    private final TlsChannel tlsChannel;
 
     private final MessageReader messageReader;
     private final MessageWriter messageWriter;
 
     // TODO implement better
     private final LinkedList<RelpFrameTX> txList = new LinkedList<>();
+
+
+    private enum RelpState {
+        NONE,
+        READ,
+        WRITE
+    }
+
+    private RelpState relpState = RelpState.NONE;
 
 
     /**
@@ -91,12 +99,11 @@ public class RelpServerTlsSocket extends RelpServerSocket {
         this.messageReader = new MessageReader(this, txList, frameProcessor);
         this.messageWriter = new MessageWriter(this, txList);
 
-
         try {
             SSLContext sslContext = SSLContextFactory.authenticatedContext(
                     "TLSv1.3");
 
-            this.socketChannel = ServerTlsChannel
+            this.tlsChannel = ServerTlsChannel
                     .newBuilder(socketChannel, sslContext)
                     .build();
         }
@@ -112,13 +119,30 @@ public class RelpServerTlsSocket extends RelpServerSocket {
      */
     @Override
     public int processRead(int ops) {
+        if (relpState == RelpState.WRITE) {
+            return processWrite(ops);
+        }
+
         ConnectionOperation cop = ConnectionOperation.READ;
 
         try {
             cop = messageReader.readRequest();
+            relpState = RelpState.NONE;
         } catch (Exception e) {
-            // FIXME
-            e.printStackTrace();
+            if (e instanceof NeedsReadException) {
+                System.out.println("r:" + e);
+                relpState = RelpState.READ;
+                return SelectionKey.OP_READ;
+            }
+            else if (e instanceof NeedsWriteException) {
+                System.out.println("r:" + e);
+                relpState = RelpState.READ;
+                return SelectionKey.OP_WRITE;
+            }
+            else {
+                // FIXME
+                e.printStackTrace();
+            }
         }
 
         if (txList.size() > 0) {
@@ -140,14 +164,31 @@ public class RelpServerTlsSocket extends RelpServerSocket {
      */
     @Override
     public int processWrite(int ops) {
+        if (relpState == RelpState.READ) {
+            return processRead(ops);
+        }
+
         ConnectionOperation cop = ConnectionOperation.WRITE;
 
         if (txList.size() > 0) {
             try {
                 cop = messageWriter.writeResponse();
+                relpState = RelpState.NONE;
             } catch (Exception e) {
-                // FIXME
-                e.printStackTrace();
+                if (e instanceof NeedsReadException) {
+                    System.out.println("w:" + e);
+                    relpState = RelpState.WRITE;
+                    return SelectionKey.OP_READ;
+                }
+                else if (e instanceof NeedsWriteException) {
+                    System.out.println("w:" + e);
+                    relpState = RelpState.WRITE;
+                    return SelectionKey.OP_WRITE;
+                }
+                else {
+                    // FIXME
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -175,17 +216,17 @@ public class RelpServerTlsSocket extends RelpServerSocket {
     @Override
     int read(ByteBuffer activeBuffer) throws IOException {
         activeBuffer.clear();
-        if( System.getenv( "RELP_SERVER_DEBUG" ) != null ) {
+        if( true ) {
             System.out.println( "relpServerSocket.read> entry ");
         }
 
         //if (!socketChannel.isConnected() ) return -1;
 
-        int bytesRead = socketChannel.read(activeBuffer);
+        int bytesRead = tlsChannel.read(activeBuffer);
         int totalBytesRead = bytesRead;
 
         while(bytesRead > 0){
-            bytesRead = socketChannel.read(activeBuffer);
+            bytesRead = tlsChannel.read(activeBuffer);
             totalBytesRead += bytesRead;
         }
         if(bytesRead == -1){
@@ -209,17 +250,17 @@ public class RelpServerTlsSocket extends RelpServerSocket {
      */
     @Override
     int write(ByteBuffer responseBuffer) throws IOException {
-        if( System.getenv( "RELP_SERVER_DEBUG" ) != null ) {
+        if( true ) {
             System.out.println( "relpServerSocket.write> entry ");
         }
 
         //if (!socketChannel.isConnected() ) return -1;
 
-        int bytesWritten      = socketChannel.write(responseBuffer);
+        int bytesWritten      = tlsChannel.write(responseBuffer);
         int totalBytesWritten = bytesWritten;
 
         while(bytesWritten > 0 && responseBuffer.hasRemaining()){
-            bytesWritten = socketChannel.write(responseBuffer);
+            bytesWritten = tlsChannel.write(responseBuffer);
             totalBytesWritten += bytesWritten;
         }
 
