@@ -223,16 +223,16 @@ public class SocketProcessor implements Runnable {
                             SocketChannel socketChannel = serverSocket.accept();
 
                             // new socket
-                            RelpServerSocket socket = new RelpServerSocket(socketChannel, frameProcessor);
+                            RelpServerSocket socket = new RelpServerPlainSocket(socketChannel, frameProcessor);
 
                             socket.setSocketId(nextSocketId++);
 
-                            socket.getSocketChannel().configureBlocking(false);
-
                             socketMap.put(socket.getSocketId(), socket);
 
+                            socketChannel.configureBlocking(false);
+
                             // all client connected sockets start in OP_READ
-                            SelectionKey key = socket.getSocketChannel().register(
+                            SelectionKey key = socketChannel.register(
                                     selector,
                                     SelectionKey.OP_READ
                             );
