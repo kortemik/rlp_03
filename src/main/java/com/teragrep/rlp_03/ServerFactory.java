@@ -3,6 +3,7 @@ package com.teragrep.rlp_03;
 import com.teragrep.rlp_03.config.Config;
 import com.teragrep.rlp_03.config.TLSConfig;
 import com.teragrep.rlp_03.context.ConnectionContextStub;
+import com.teragrep.rlp_03.context.FrameProcessorPool;
 import com.teragrep.rlp_03.context.channel.PlainFactory;
 import com.teragrep.rlp_03.context.channel.SocketFactory;
 import com.teragrep.rlp_03.context.channel.TLSFactory;
@@ -22,12 +23,14 @@ public class ServerFactory {
 
     final Config config;
     final TLSConfig tlsConfig;
-    final Supplier<FrameProcessor> frameProcessorSupplier;
 
     final ThreadPoolExecutor executorService;
-    final ConnectionContextStub connectionContextStub;
-    final InetSocketAddress listenSocketAddress;
 
+    final FrameProcessorPool frameProcessorPool;
+
+    final ConnectionContextStub connectionContextStub;
+
+    final InetSocketAddress listenSocketAddress;
 
     public ServerFactory(Config config, FrameProcessor frameProcessor) {
         this(config, () -> frameProcessor);
@@ -54,8 +57,7 @@ public class ServerFactory {
 
         this.config = config;
         this.tlsConfig = tlsConfig;
-        this.frameProcessorSupplier = frameProcessorSupplier;
-
+        this.frameProcessorPool = new FrameProcessorPool(frameProcessorSupplier);
         this.executorService = new ThreadPoolExecutor(config.numberOfThreads, config.numberOfThreads, Long.MAX_VALUE, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
         this.connectionContextStub = new ConnectionContextStub();
         this.listenSocketAddress = new InetSocketAddress(config.port);
@@ -79,6 +81,6 @@ public class ServerFactory {
         serverSocketChannel.configureBlocking(false);
         serverSocketChannel.register(selector, OP_ACCEPT);
 
-        return new Server(executorService, frameProcessorSupplier, serverSocketChannel, socketFactory, selector);
+        return new Server(executorService, frameProcessorPool, serverSocketChannel, socketFactory, selector);
     }
 }

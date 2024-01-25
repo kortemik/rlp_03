@@ -3,6 +3,7 @@ package com.teragrep.rlp_03.context;
 import com.teragrep.rlp_01.RelpCommand;
 import com.teragrep.rlp_01.RelpFrameTX;
 import com.teragrep.rlp_03.SyslogFrameProcessor;
+import com.teragrep.rlp_03.context.RelpFrameServerRX;
 import com.teragrep.rlp_03.context.channel.SocketFake;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ public class SyslogFrameProcessorTest {
         RelpWriteFake relpWriteFake = new RelpWriteFake();
         ConnectionContext connectionContext = new ConnectionContextFake(interestOpsFake, socketFake, relpWriteFake);
 
-        frameProcessor.accept(createOpenFrame(connectionContext));
+        frameProcessor.process(createOpenFrame(connectionContext));
 
         RelpFrameTX txFrame = relpWriteFake.writtenFrames().get(0);
 
@@ -93,7 +94,7 @@ public class SyslogFrameProcessorTest {
         RelpWriteFake relpWriteFake = new RelpWriteFake();
         ConnectionContext connectionContext = new ConnectionContextFake(interestOpsFake, socketFake, relpWriteFake);
 
-        frameProcessor.accept(createSyslogFrame(connectionContext, "test message"));
+        frameProcessor.process(createSyslogFrame(connectionContext, "test message"));
 
         RelpFrameTX txFrame = relpWriteFake.writtenFrames().get(0);
 
@@ -118,17 +119,17 @@ public class SyslogFrameProcessorTest {
         RelpWriteFake relpWriteFake = new RelpWriteFake();
         ConnectionContext connectionContext = new ConnectionContextFake(interestOpsFake, socketFake, relpWriteFake);
 
-        frameProcessor.accept(createOpenFrame(connectionContext));
+        frameProcessor.process(createOpenFrame(connectionContext));
 
         RelpFrameTX txFrameOpenResponse = relpWriteFake.writtenFrames().get(0);
         Assertions.assertEquals(RelpCommand.RESPONSE, txFrameOpenResponse.getCommand());
 
-        frameProcessor.accept(createSyslogFrame(connectionContext, "test message"));
+        frameProcessor.process(createSyslogFrame(connectionContext, "test message"));
 
         RelpFrameTX txFrameSyslogResponse = relpWriteFake.writtenFrames().get(1);
         Assertions.assertEquals(RelpCommand.RESPONSE, txFrameSyslogResponse.getCommand());
 
-        frameProcessor.accept(createCloseFrame(connectionContext));
+        frameProcessor.process(createCloseFrame(connectionContext));
 
         RelpFrameTX txFrameCloseResponse = relpWriteFake.writtenFrames().get(2);;
         Assertions.assertEquals(RelpCommand.RESPONSE, txFrameCloseResponse.getCommand());
