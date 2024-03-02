@@ -9,7 +9,7 @@ public class BufferLeaseImpl implements BufferLease {
 
     public BufferLeaseImpl(BufferContainer bc) {
         this.bufferContainer = bc;
-        this.phaser = new Phaser(1); // registered = 1
+        this.phaser = new ClearingPhaser(1); // registered = 1
     }
 
     @Override
@@ -35,12 +35,18 @@ public class BufferLeaseImpl implements BufferLease {
 
     @Override
     public void addRef() {
-        this.phaser.register();
+        int a = this.phaser.register();
+        if (a < 0) {
+            throw new IllegalStateException("paksis");
+        }
     }
 
     @Override
     public void removeRef() {
-        phaser.arriveAndDeregister();
+        int a = phaser.arriveAndDeregister();
+        if (a < 0) {
+            throw new IllegalStateException("poksis");
+        }
     }
 
     @Override
@@ -55,13 +61,27 @@ public class BufferLeaseImpl implements BufferLease {
 
     @Override
     public synchronized boolean attemptRelease() {
-        boolean rv = false;
-        removeRef();
-        if (isRefCountZero()) {
-            buffer().clear();
-            rv = true;
+        int a = phaser.arriveAndDeregister();
+        if (a < 0) {
+            throw new IllegalStateException("poks");
         }
-        return rv;
+        return phaser.isTerminated();
+    }
+
+    private class ClearingPhaser extends Phaser {
+        public ClearingPhaser(int i) {
+            super(i);
+        }
+
+        @Override
+        protected boolean onAdvance(int phase, int registeredParties) {
+            boolean rv = false;
+            if (registeredParties == 0) {
+                buffer().clear();
+                rv = true;
+            }
+            return rv;
+        }
     }
 
 }
