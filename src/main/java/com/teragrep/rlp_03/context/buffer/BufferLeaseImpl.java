@@ -4,11 +4,15 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.Phaser;
 
 public class BufferLeaseImpl implements BufferLease {
-    protected BufferContainer bufferContainer;
+    private final BufferContainer bufferContainer;
     private final Phaser phaser;
 
-    public BufferLeaseImpl(BufferContainer bc) {
+    private final BufferLeasePool bufferLeasePool;
+
+    public BufferLeaseImpl(BufferContainer bc, BufferLeasePool bufferLeasePool) {
         this.bufferContainer = bc;
+        this.bufferLeasePool = bufferLeasePool;
+
         this.phaser = new ClearingPhaser(1); // registered = 1
     }
 
@@ -61,11 +65,16 @@ public class BufferLeaseImpl implements BufferLease {
 
     @Override
     public synchronized boolean attemptRelease() {
+        /*
         int a = phaser.arriveAndDeregister();
         if (a < 0) {
             throw new IllegalStateException("poks");
         }
         return phaser.isTerminated();
+
+         */
+        throw new IllegalArgumentException("not implemented anymore");
+
     }
 
     private class ClearingPhaser extends Phaser {
@@ -78,6 +87,7 @@ public class BufferLeaseImpl implements BufferLease {
             boolean rv = false;
             if (registeredParties == 0) {
                 buffer().clear();
+                bufferLeasePool.internalOffer(bufferContainer);
                 rv = true;
             }
             return rv;
