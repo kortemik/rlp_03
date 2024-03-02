@@ -21,47 +21,61 @@ public class BufferLeasePool {
 
     private final Supplier<ByteBuffer> byteBufferSupplier;
 
-    private final ConcurrentLinkedQueue<BufferLease> queue;
+    private final ConcurrentLinkedQueue<BufferContainer> queue;
 
     private final BufferLease bufferLeaseStub;
+    private final BufferContainer bufferContainerStub;
     private final AtomicBoolean close;
 
     private final int segmentSize;
 
     private final AtomicLong bufferId;
 
-    private final AtomicBoolean closeInProgress;
+    private final Lock lock;
+
     // TODO check locking pattern, addRef in BufferLease can escape offer's check and cause dirty in pool?
     public BufferLeasePool() {
         this.segmentSize = 4096;
         this.byteBufferSupplier = () -> ByteBuffer.allocateDirect(segmentSize); // TODO configurable extents
         this.queue = new ConcurrentLinkedQueue<>();
         this.bufferLeaseStub = new BufferLeaseStub();
-        this.closeInProgress = new AtomicBoolean();
+        this.bufferContainerStub = new BufferContainerStub();
         this.close = new AtomicBoolean();
         this.bufferId = new AtomicLong();
-
+        this.lock = new ReentrantLock();
     }
 
     private BufferLease take() {
         // get or create
-        BufferLease bufferLease = queue.poll();
-        if (bufferLease == null) {
-            bufferLease = new BufferLeaseImpl(bufferId.incrementAndGet(), byteBufferSupplier.get());
+        BufferContainer bufferContainer = queue.poll();
+        BufferLease bufferLease;
+        if (bufferContainer == null) {
+            // if queue is empty or stub object, create a new BufferContainer and BufferLease.
+            bufferLease = new BufferLeaseImpl(
+                    new BufferContainerImpl(bufferId.incrementAndGet(), byteBufferSupplier.get())
+                    ,
+                    this);
+        } else {
+            // otherwise, wrap bufferContainer with phaser decorator (bufferLease)
+            bufferLease = new BufferLeaseImpl(bufferContainer, this);
         }
-
-        bufferLease.addRef(); // all start with one ref
 
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("returning bufferLease id <{}> with refs <{}> at buffer position <{}>", bufferLease.id(), bufferLease.refs(), bufferLease.buffer().position());
+            LOGGER.debug("returning bufferLease id <{}> with refs<{}> at buffer position <{}>", bufferLease.id(), bufferLease.refs(), bufferLease.buffer().position());
         }
+
+        if (bufferLease.buffer().position() != 0) {
+            LOGGER.error("dirty buffer in pool, terminating");
+            System.exit(1);
+        }
+
         return bufferLease;
 
     }
 
     public List<BufferLease> take(long size) {
         if (close.get()) {
-            return Collections.singletonList(bufferLeaseStub);
+            return Collections.singletonList(this.bufferLeaseStub);
         }
 
         LOGGER.debug("requesting take with size <{}>", size);
@@ -78,29 +92,28 @@ public class BufferLeasePool {
     }
 
     public void offer(BufferLease bufferLease) {
-        if (bufferLease.attemptRelease()) {
-            internalOffer(bufferLease);
-        }
+        bufferLease.removeRef();
     }
 
-    private void internalOffer(BufferLease bufferLease) {
-        if (!bufferLease.isStub()) {
-            queue.add(bufferLease);
+    void internalOffer(BufferContainer bufferContainer) {
+        // Adding back to pool:
+        // - If stub, add container stub to queue
+        // - If not, add container from lease
+        if (!bufferContainer.isStub()) {
+            queue.add(bufferContainer);
         }
 
         if (close.get()) {
             LOGGER.debug("closing in offer");
             while (queue.peek() != null) {
-                if (closeInProgress.compareAndSet(false, true)) {
+                if (lock.tryLock()) {
                     while (true) {
-                        BufferLease queuedBufferLease = queue.poll();
-                        if (queuedBufferLease == null) {
+                        BufferContainer queuedBufferContainer = queue.poll();
+                        if (queuedBufferContainer == null) {
                             break;
                         }
                     }
-                    if (!closeInProgress.compareAndSet(true, false)) {
-                        throw new IllegalStateException("logic failure");
-                    }
+                    lock.unlock();
                 } else {
                     break;
                 }
@@ -118,7 +131,7 @@ public class BufferLeasePool {
         close.set(true);
 
         // close all that are in the pool right now
-        internalOffer(bufferLeaseStub);
+        internalOffer(bufferContainerStub);
 
     }
 

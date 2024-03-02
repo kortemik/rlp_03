@@ -1,80 +1,97 @@
 package com.teragrep.rlp_03.context.buffer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.Phaser;
 
 public class BufferLeaseImpl implements BufferLease {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BufferLeaseImpl.class);
-    private final long id;
-    private final ByteBuffer buffer;
-    private final AtomicLong refCount;
+    private final BufferContainer bufferContainer;
+    private final Phaser phaser;
 
+    private final BufferLeasePool bufferLeasePool;
 
-    public BufferLeaseImpl(long id, ByteBuffer buffer) {
-        this.id = id;
-        this.buffer = buffer;
-        this.refCount = new AtomicLong();
+    public BufferLeaseImpl(BufferContainer bc, BufferLeasePool bufferLeasePool) {
+        this.bufferContainer = bc;
+        this.bufferLeasePool = bufferLeasePool;
+
+        this.phaser = new ClearingPhaser(1); // registered = 1
+    }
+
+    @Override
+    public BufferContainer bufferContainer() {
+        return this.bufferContainer;
     }
 
     @Override
     public long id() {
-        return id;
+        return this.bufferContainer.id();
     }
 
     @Override
     public long refs() {
-        return refCount.get();
+        // initial number of registered parties is 1
+        return phaser.getRegisteredParties();
     }
 
     @Override
-    public synchronized ByteBuffer buffer() {
-            return buffer;
+    public ByteBuffer buffer() {
+        return this.bufferContainer.buffer();
     }
 
     @Override
     public void addRef() {
-        refCount.getAndIncrement();
+        int a = this.phaser.register();
+        if (a < 0) {
+            throw new IllegalStateException("paksis");
+        }
     }
 
     @Override
     public void removeRef() {
-        long newRefs = refCount.decrementAndGet();
-        if (newRefs < 0) {
-            throw new IllegalStateException("refs must not be negative");
+        int a = phaser.arriveAndDeregister();
+        if (a < 0) {
+            throw new IllegalStateException("poksis");
         }
     }
 
     @Override
     public boolean isRefCountZero() {
-        return refCount.get() == 0;
-    }
-
-
-    @Override
-    public String toString() {
-        return "BufferLease{" +
-                "buffer=" + buffer +
-                ", refCount=" + refCount.get() +
-                '}';
+        return phaser.isTerminated();
     }
 
     @Override
     public boolean isStub() {
-        LOGGER.debug("id <{}>", id);
-        return false;
+        return this.bufferContainer.isStub();
     }
 
     @Override
     public synchronized boolean attemptRelease() {
-        boolean rv = false;
-        removeRef();
-        if (refCount.get() == 0) {
-            buffer().clear();
-            rv = true;
+        /*
+        int a = phaser.arriveAndDeregister();
+        if (a < 0) {
+            throw new IllegalStateException("poks");
         }
-        return rv;
+        return phaser.isTerminated();
+
+         */
+        throw new IllegalArgumentException("not implemented anymore");
+
     }
+
+    private class ClearingPhaser extends Phaser {
+        public ClearingPhaser(int i) {
+            super(i);
+        }
+
+        @Override
+        protected boolean onAdvance(int phase, int registeredParties) {
+            boolean rv = false;
+            if (registeredParties == 0) {
+                buffer().clear();
+                bufferLeasePool.internalOffer(bufferContainer);
+                rv = true;
+            }
+            return rv;
+        }
+    }
+
 }
