@@ -160,18 +160,20 @@ final class RelpWriteImpl implements RelpWrite {
 
         try {
             if (true) {
-
+                ByteBuffer[] writeBuffers = new ByteBuffer[fragmentsToSend.size()];
+                int index = 0;
                 for (FragmentWrite fragmentWrite : fragmentsToSend) {
                     int writeSize = 0;
                     writeSize += fragmentWrite.length();
                     ByteBuffer writeBuffer = ByteBuffer.allocateDirect(writeSize);
                     fragmentWrite.to(writeBuffer);
                     writeBuffer.flip();
-                    long bytesWritten = establishedContext.socket().write(new ByteBuffer[] {
-                            writeBuffer
-                    });
-                    LOGGER.info("wrote <{}>", bytesWritten);
+                    writeBuffers[index] = writeBuffer;
+                    index++;
                 }
+                long bytesWritten = establishedContext.socket().write(writeBuffers);
+                LOGGER.info("wrote <{}>", bytesWritten);
+
                 fragmentsToSend.clear();
 
             }
