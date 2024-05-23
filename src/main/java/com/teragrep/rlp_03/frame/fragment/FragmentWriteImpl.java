@@ -79,13 +79,25 @@ public class FragmentWriteImpl implements FragmentWrite {
     }
 
     @Override
-    public long length() {
+    public int length() {
         long length = 0;
 
         for (ByteBuffer buffer : bufferSliceList) {
             length = length + buffer.limit();
         }
 
-        return length;
+        if (length > Integer.MAX_VALUE) {
+            throw new IllegalStateException("size exceed maximum buffer size <" + Integer.MAX_VALUE + ">");
+        }
+
+        return (int) length;
     }
+
+    @Override
+    public void to(ByteBuffer writeBuffer) {
+        for (ByteBuffer buffer : bufferSliceList) {
+            writeBuffer.put(buffer);
+        }
+    }
+
 }

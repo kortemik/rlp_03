@@ -48,6 +48,7 @@ package com.teragrep.rlp_03.frame.fragment;
 import com.teragrep.rlp_03.channel.socket.Socket;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public interface FragmentWrite {
 
@@ -55,5 +56,8 @@ public interface FragmentWrite {
 
     boolean hasRemaining();
 
-    long length();
+    int length();
+
+    void to(ByteBuffer writeBuffer);
+
 }

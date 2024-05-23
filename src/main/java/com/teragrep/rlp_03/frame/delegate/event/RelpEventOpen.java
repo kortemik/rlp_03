@@ -90,7 +90,7 @@ public class RelpEventOpen extends RelpEvent {
             frameContext.establishedContext().relpWrite().accept(Collections.singletonList(frame));
         }
         finally {
-            frameContext.relpFrame().close();
+            // frameContext.relpFrame().close();
         }
     }
 

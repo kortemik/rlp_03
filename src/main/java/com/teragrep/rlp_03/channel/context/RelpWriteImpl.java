@@ -55,6 +55,7 @@ import tlschannel.NeedsWriteException;
 
 import java.io.IOException;
 
+import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -158,29 +159,47 @@ final class RelpWriteImpl implements RelpWrite {
         }
 
         try {
-            Iterator<FragmentWrite> it = fragmentsToSend.iterator();
-            while (it.hasNext()) {
-                FragmentWrite fragmentWrite = it.next();
-                long bytesWritten = fragmentWrite.write(establishedContext.socket());
-
-                if (bytesWritten < 0) {
-                    LOGGER
-                            .error(
-                                    "Socket write returns <{}>. Closing connection to  PeerAddress <{}> PeerPort <{}>",
-                                    bytesWritten, establishedContext.socket().getTransportInfo().getPeerAddress(),
-                                    establishedContext.socket().getTransportInfo().getPeerPort()
-                            );
-                    // close connection
-                    establishedContext.close();
-                    return false;
+            if (true) {
+                int writeSize = 0;
+                for (FragmentWrite fragmentWrite : fragmentsToSend) {
+                    writeSize += fragmentWrite.length();
                 }
-
-                if (fragmentWrite.hasRemaining()) {
-                    // partial write
-                    break;
+                ByteBuffer writeBuffer = ByteBuffer.allocateDirect(writeSize);
+                for (FragmentWrite fragmentWrite : fragmentsToSend) {
+                    fragmentWrite.to(writeBuffer);
                 }
-                else {
-                    it.remove();
+                fragmentsToSend.clear();
+                writeBuffer.flip();
+                long bytesWritten = establishedContext.socket().write(new ByteBuffer[] {
+                        writeBuffer
+                });
+                LOGGER.info("wrote <{}>", bytesWritten);
+            }
+            else {
+                Iterator<FragmentWrite> it = fragmentsToSend.iterator();
+                while (it.hasNext()) {
+                    FragmentWrite fragmentWrite = it.next();
+                    long bytesWritten = fragmentWrite.write(establishedContext.socket());
+
+                    if (bytesWritten < 0) {
+                        LOGGER
+                                .error(
+                                        "Socket write returns <{}>. Closing connection to  PeerAddress <{}> PeerPort <{}>",
+                                        bytesWritten, establishedContext.socket().getTransportInfo().getPeerAddress(),
+                                        establishedContext.socket().getTransportInfo().getPeerPort()
+                                );
+                        // close connection
+                        establishedContext.close();
+                        return false;
+                    }
+
+                    if (fragmentWrite.hasRemaining()) {
+                        // partial write
+                        break;
+                    }
+                    else {
+                        it.remove();
+                    }
                 }
             }
 

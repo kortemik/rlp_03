@@ -50,6 +50,7 @@ import com.teragrep.rlp_03.frame.access.Access;
 import com.teragrep.rlp_03.frame.access.Lease;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class FragmentWriteAccess implements FragmentWrite {
 
@@ -76,9 +77,17 @@ public class FragmentWriteAccess implements FragmentWrite {
     }
 
     @Override
-    public long length() {
+    public int length() {
         try (Lease ignored = access.get()) {
             return fragmentWrite.length();
         }
     }
+
+    @Override
+    public void to(ByteBuffer writeBuffer) {
+        try (Lease ignored = access.get()) {
+            fragmentWrite.to(writeBuffer);
+        }
+    }
+
 }
