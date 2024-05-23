@@ -50,6 +50,7 @@ import com.teragrep.rlp_03.channel.socket.Socket;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
+import java.util.List;
 
 public class FragmentWriteImpl implements FragmentWrite {
 
@@ -98,6 +99,11 @@ public class FragmentWriteImpl implements FragmentWrite {
         for (ByteBuffer buffer : bufferSliceList) {
             writeBuffer.put(buffer);
         }
+    }
+
+    @Override
+    public List<ByteBuffer> asByteBufferList() {
+        return bufferSliceList;
     }
 
 }

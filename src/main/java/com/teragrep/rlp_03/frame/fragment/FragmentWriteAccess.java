@@ -51,6 +51,7 @@ import com.teragrep.rlp_03.frame.access.Lease;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 public class FragmentWriteAccess implements FragmentWrite {
 
@@ -87,6 +88,13 @@ public class FragmentWriteAccess implements FragmentWrite {
     public void to(ByteBuffer writeBuffer) {
         try (Lease ignored = access.get()) {
             fragmentWrite.to(writeBuffer);
+        }
+    }
+
+    @Override
+    public List<ByteBuffer> asByteBufferList() {
+        try (Lease ignored = access.get()) {
+            return fragmentWrite.asByteBufferList();
         }
     }
 

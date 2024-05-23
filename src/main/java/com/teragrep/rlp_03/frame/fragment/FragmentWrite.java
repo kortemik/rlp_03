@@ -49,6 +49,7 @@ import com.teragrep.rlp_03.channel.socket.Socket;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 public interface FragmentWrite {
 
@@ -59,5 +60,7 @@ public interface FragmentWrite {
     int length();
 
     void to(ByteBuffer writeBuffer);
+
+    List<ByteBuffer> asByteBufferList();
 
 }
