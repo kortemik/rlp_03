@@ -46,13 +46,15 @@
 package com.teragrep.rlp_03.channel.context;
 
 import com.teragrep.rlp_03.channel.socket.Socket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
 public final class Writeables implements Writeable {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(Writeables.class);
     private final List<Writeable> writeables;
 
     public Writeables(List<Writeable> writeables) {
@@ -68,7 +70,6 @@ public final class Writeables implements Writeable {
             writeable.write(socket);
 
             if (writeable.hasRemaining()) {
-                // partial write
                 break;
             }
             else {

@@ -54,6 +54,7 @@ import java.io.IOException;
 
 import java.nio.channels.CancelledKeyException;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -87,10 +88,13 @@ final class RelpWriteImpl implements RelpWrite {
 
         if (!writeable.isStub()) {
             queue.add(writeable);
+            ForkJoinPool.commonPool().submit(this);
+            return;
         }
 
         while (queue.peek() != null) {
             if (lock.tryLock()) {
+                //LOGGER.info("queue.size <{}>", queue.size());
                 try {
                     while (true) {
                         // peek first, it may be partially written

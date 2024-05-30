@@ -47,13 +47,15 @@ package com.teragrep.rlp_03.frame.fragment;
 
 import com.teragrep.rlp_03.channel.context.Writeable;
 import com.teragrep.rlp_03.channel.socket.Socket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
 public final class FragmentWriteImpl implements Writeable {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(FragmentWriteImpl.class);
     private final LinkedList<ByteBuffer> bufferSliceList;
 
     FragmentWriteImpl(LinkedList<ByteBuffer> bufferSliceList) {
@@ -66,6 +68,9 @@ public final class FragmentWriteImpl implements Writeable {
         long bytesWritten = socket.write(buffers);
         if (bytesWritten < 0) {
             throw new IOException("connection closed");
+        }
+        if (bytesWritten == 0) {
+            LOGGER.info("partial write");
         }
     }
 
