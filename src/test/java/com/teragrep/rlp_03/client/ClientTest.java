@@ -82,7 +82,7 @@ public class ClientTest {
         eventLoopThread = new Thread(eventLoop);
         eventLoopThread.start();
 
-        executorService = Executors.newSingleThreadExecutor();
+        executorService = Executors.newCachedThreadPool();
         ServerFactory serverFactory = new ServerFactory(
                 eventLoop,
                 executorService,
@@ -147,6 +147,105 @@ public class ClientTest {
                 LOGGER.debug("syslogResponse <[{}]>", syslogResponse);
                 Assertions.assertEquals("200 OK", syslogResponse.payload().toString());
             } // close the syslogResponse frame, free resources
+
+            // test close response
+            try (RelpFrame closeResponse = close.get()) {
+                Assertions.assertEquals("rsp", closeResponse.command().toString());
+                LOGGER.debug("closeResponse <[{}]>", closeResponse);
+                Assertions.assertEquals("", closeResponse.payload().toString());
+            } // close the closeResponse frame, free resources
+        }
+        catch (InterruptedException | ExecutionException | TimeoutException exception) {
+            throw new RuntimeException(exception);
+        }
+    }
+
+    @Test
+    public void testMultiTheadedClientUse() {
+        // client takes resources from this pool
+        ExecutorService executorService = Executors.newCachedThreadPool();
+
+        // client connection type
+        SocketFactory socketFactory = new PlainFactory();
+
+        ConnectContextFactory connectContextFactory = new ConnectContextFactory(executorService, socketFactory);
+        RelpClientFactory relpClientFactory = new RelpClientFactory(connectContextFactory, eventLoop);
+
+        RelpFrameFactory relpFrameFactory = new RelpFrameFactory();
+        try (
+                RelpClient relpClient = relpClientFactory.open(new InetSocketAddress("localhost", port)).get(1, TimeUnit.SECONDS)
+        ) {
+
+            CompletableFuture<RelpFrame> open = relpClient
+                    .transmit(relpFrameFactory.create("open", "a hallo multi-yo client"));
+
+            // test open response
+            try (RelpFrame openResponse = open.get()) {
+                LOGGER.debug("openResponse <[{}]>", openResponse);
+                Assertions.assertEquals("rsp", openResponse.command().toString());
+                Pattern pattern = Pattern
+                        .compile(
+                                "200 OK\\nrelp_version=0\\nrelp_software=rlp_03,[0-9]+.[0-9]+.[0-9]+(-[a-zA-Z0-9]+)?,https://teragrep.com\\ncommands=syslog\\n"
+                        );
+                Matcher matcher = pattern.matcher(openResponse.payload().toString());
+                Assertions.assertTrue(matcher.find());
+            } // close the openResponse frame, free resources
+
+
+            Runnable runnable = () -> {
+                while (true) {
+                    // send syslog
+                    CompletableFuture<RelpFrame> syslog = relpClient.transmit(
+                            relpFrameFactory.create("syslog", "multi-client payloads here"));
+
+                    try {
+                        int a = syslog.get().txn().toInt();
+                        if (a % 10000 == 0) {
+                            System.out.println("from " + Thread.currentThread().getName() + " a: " + a);
+                        }
+                    }
+                    catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    catch (ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+            };
+
+            Thread thread1 = new Thread(runnable);
+            Thread thread2 = new Thread(runnable);
+            Thread thread3 = new Thread(runnable);
+            Thread thread4 = new Thread(runnable);
+            Thread thread5 = new Thread(runnable);
+            Thread thread6 = new Thread(runnable);
+            Thread thread7 = new Thread(runnable);
+            Thread thread8 = new Thread(runnable);
+
+            thread1.start();
+            thread2.start();
+            thread3.start();
+            thread4.start();
+            thread5.start();
+            thread6.start();
+            thread7.start();
+            thread8.start();
+
+            thread1.join();
+            thread2.join();
+            thread3.join();
+            thread4.join();
+            thread5.join();
+            thread6.join();
+            thread7.join();
+            thread8.join();
+
+
+
+            // send close
+            CompletableFuture<RelpFrame> close = relpClient.transmit(relpFrameFactory.create("close", ""));
+
 
             // test close response
             try (RelpFrame closeResponse = close.get()) {
