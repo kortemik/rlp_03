@@ -91,11 +91,11 @@ public class ClientTest {
             long current = bytes.addAndGet(1);
 
             if (current % 1000000 == 0) {
-                System.out.println("SERVER processed: " + current);
+                System.out.println("SERVER " + Thread.currentThread().getName() + " processed: " + current);
             }
         };
 
-        executorService = Executors.newCachedThreadPool();
+        executorService = ForkJoinPool.commonPool();
         ServerFactory serverFactory = new ServerFactory(
                 eventLoop,
                 executorService,
@@ -104,6 +104,31 @@ public class ClientTest {
         );
 
         Assertions.assertAll(() -> serverFactory.create(port));
+
+        for (int i = 0; i < 25; i++) {
+            EventLoop el = null;
+            try {
+                el = eventLoopFactory.create();
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            new Thread(el, "SERVER_EL_" + i).start();
+
+            ServerFactory sf2 = new ServerFactory(
+                    el,
+                    executorService,
+                    new PlainFactory(),
+                    new FrameDelegationClockFactory(() -> new DefaultFrameDelegate(sharedConsumer))
+            );
+
+            try {
+                sf2.create(23602 + i);
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     @AfterAll
