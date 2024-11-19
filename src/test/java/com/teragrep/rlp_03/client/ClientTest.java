@@ -88,7 +88,11 @@ public class ClientTest {
         AtomicLong bytes = new AtomicLong();
         AtomicLong approxGigas = new AtomicLong();
         Consumer<FrameContext> sharedConsumer = frameContext -> {
-            long current = bytes.addAndGet(frameContext.relpFrame().payloadLength().toInt());
+            long current = bytes.addAndGet(1);
+
+            if (current % 1000000 == 0) {
+                System.out.println("SERVER processed: " + current);
+            }
         };
 
         executorService = Executors.newCachedThreadPool();
@@ -265,7 +269,7 @@ public class ClientTest {
 
                         try {
                             int a = syslog.get().txn().toInt();
-                            if (a % 10000 == 0) {
+                            if (a % 100000 == 0) {
                                 System.out.println("from " + Thread.currentThread().getName() + " a: " + a);
                             }
                         }
