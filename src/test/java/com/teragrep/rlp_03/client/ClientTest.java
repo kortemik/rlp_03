@@ -55,6 +55,7 @@ import com.teragrep.rlp_03.frame.RelpFrameFactory;
 import com.teragrep.rlp_03.frame.delegate.DefaultFrameDelegate;
 import com.teragrep.net_01.eventloop.EventLoop;
 import com.teragrep.net_01.server.ServerFactory;
+import com.teragrep.rlp_03.frame.delegate.FrameContext;
 import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,15 +82,21 @@ public class ClientTest {
         EventLoopFactory eventLoopFactory = new EventLoopFactory();
         Assertions.assertAll(() -> eventLoop = eventLoopFactory.create());
 
-        eventLoopThread = new Thread(eventLoop);
+        eventLoopThread = new Thread(eventLoop, "SERVER_EL");
         eventLoopThread.start();
+
+        AtomicLong bytes = new AtomicLong();
+        AtomicLong approxGigas = new AtomicLong();
+        Consumer<FrameContext> sharedConsumer = frameContext -> {
+            long current = bytes.addAndGet(frameContext.relpFrame().payloadLength().toInt());
+        };
 
         executorService = Executors.newCachedThreadPool();
         ServerFactory serverFactory = new ServerFactory(
                 eventLoop,
                 executorService,
                 new PlainFactory(),
-                new FrameDelegationClockFactory(() -> new DefaultFrameDelegate((frame) -> LOGGER.debug("server got <[{}]>", frame.relpFrame())))
+                new FrameDelegationClockFactory(() -> new DefaultFrameDelegate(sharedConsumer))
         );
 
         Assertions.assertAll(() -> serverFactory.create(port));
@@ -161,15 +170,33 @@ public class ClientTest {
     }
 
     @Test
-    public void testMultiTheadedClientUse() throws InterruptedException {
-        Thread client1 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client2 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client3 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client4 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client5 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client6 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client7 = new Thread(new MTSharedClient(eventLoop, port));
-        Thread client8 = new Thread(new MTSharedClient(eventLoop, port));
+    public void testMultiTheadedClientUse() throws InterruptedException, IOException {
+        EventLoopFactory clientEventLoopFactory = new EventLoopFactory();
+        EventLoop eventLoop1 = clientEventLoopFactory.create();
+        new Thread(eventLoop1, "CLIENT_EL1").start();
+        EventLoop eventLoop2 = clientEventLoopFactory.create();
+        new Thread(eventLoop2, "CLIENT_EL2").start();
+        EventLoop eventLoop3 = clientEventLoopFactory.create();
+        new Thread(eventLoop3, "CLIENT_EL3").start();
+        EventLoop eventLoop4 = clientEventLoopFactory.create();
+        new Thread(eventLoop4, "CLIENT_EL4").start();
+        EventLoop eventLoop5 = clientEventLoopFactory.create();
+        new Thread(eventLoop5, "CLIENT_EL5").start();
+        EventLoop eventLoop6 = clientEventLoopFactory.create();
+        new Thread(eventLoop6, "CLIENT_EL6").start();
+        EventLoop eventLoop7 = clientEventLoopFactory.create();
+        new Thread(eventLoop7, "CLIENT_EL7").start();
+        EventLoop eventLoop8 = clientEventLoopFactory.create();
+        new Thread(eventLoop8, "CLIENT_EL8").start();
+
+        Thread client1 = new Thread(new MTSharedClient(eventLoop1, port, ForkJoinPool.commonPool()));
+        Thread client2 = new Thread(new MTSharedClient(eventLoop2, port, ForkJoinPool.commonPool()));
+        Thread client3 = new Thread(new MTSharedClient(eventLoop3, port, ForkJoinPool.commonPool()));
+        Thread client4 = new Thread(new MTSharedClient(eventLoop4, port, ForkJoinPool.commonPool()));
+        Thread client5 = new Thread(new MTSharedClient(eventLoop5, port, ForkJoinPool.commonPool()));
+        Thread client6 = new Thread(new MTSharedClient(eventLoop6, port, ForkJoinPool.commonPool()));
+        Thread client7 = new Thread(new MTSharedClient(eventLoop7, port, ForkJoinPool.commonPool()));
+        Thread client8 = new Thread(new MTSharedClient(eventLoop8, port, ForkJoinPool.commonPool()));
 
         client1.start();
         client2.start();
@@ -194,17 +221,16 @@ public class ClientTest {
 
         private final EventLoop eventLoop;
         private final int port;
+        private final ExecutorService executorService;
 
-        MTSharedClient(EventLoop eventLoop, int port) {
+        MTSharedClient(EventLoop eventLoop, int port, ExecutorService executorService) {
             this.eventLoop = eventLoop;
             this.port = port;
+            this.executorService = executorService;
         }
 
         @Override
         public void run() {
-            // client takes resources from this pool
-            ExecutorService executorService = Executors.newCachedThreadPool();
-
             // client connection type
             SocketFactory socketFactory = new PlainFactory();
 
