@@ -194,6 +194,7 @@ public class ClientTest {
 
         private final EventLoop eventLoop;
         private final int port;
+
         MTSharedClient(EventLoop eventLoop, int port) {
             this.eventLoop = eventLoop;
             this.port = port;
@@ -230,12 +231,11 @@ public class ClientTest {
                     Assertions.assertTrue(matcher.find());
                 } // close the openResponse frame, free resources
 
-
                 Runnable runnable = () -> {
                     while (true) {
                         // send syslog
-                        CompletableFuture<RelpFrame> syslog = relpClient.transmit(
-                                relpFrameFactory.create("syslog", "multi-client payloads here"));
+                        CompletableFuture<RelpFrame> syslog = relpClient
+                                .transmit(relpFrameFactory.create("syslog", "multi-client payloads here"));
 
                         try {
                             int a = syslog.get().txn().toInt();
@@ -280,11 +280,8 @@ public class ClientTest {
                 thread7.join();
                 thread8.join();
 
-
-
                 // send close
                 CompletableFuture<RelpFrame> close = relpClient.transmit(relpFrameFactory.create("close", ""));
-
 
                 // test close response
                 try (RelpFrame closeResponse = close.get()) {
